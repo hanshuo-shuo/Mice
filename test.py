@@ -14,6 +14,10 @@ def get_prey_position(obs):
     return obs[:2]
 
 if __name__ == "__main__":
+    # discrete action
+    action_type = BotEvadeEnv.ActionType.DISCRETE
+    # continuous action
+    # action_type = BotEvadeEnv.ActionType.CONTINUOUS
     env = BotEvadeEnv(world_name="21_05", 
                   use_lppos=False, 
                   use_predator=True, 
@@ -22,8 +26,9 @@ if __name__ == "__main__":
                   time_step=0.25,
                   render=True, 
                   real_time=True,
-                  action_type=BotEvadeEnv.ActionType.DISCRETE,
+                  action_type=action_type,
                 )
+
     
     # Store predator appearance positions
     predator_appearance_positions = []
