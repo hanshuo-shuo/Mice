@@ -3,7 +3,6 @@ from env import BotEvadeEnv
 from reward import custom_reward
 import cellworld_game as cwgame
 import numpy as np
-import matplotlib.pyplot as plt
 
 def is_predator_visible(obs):
     """Check if predator is visible by checking if elements 45-89 are non-zero"""
@@ -15,14 +14,14 @@ def get_prey_position(obs):
     return obs[:2]
 
 if __name__ == "__main__":
-    env = BotEvadeEnv(world_name="clump01_05", 
+    env = BotEvadeEnv(world_name="21_05", 
                   use_lppos=False, 
                   use_predator=True, 
                   reward_function=custom_reward,
                   max_step=300,
                   time_step=0.25,
-                  render=False,  # Turn off rendering for faster execution
-                  real_time=False,
+                  render=True, 
+                  real_time=True,
                   action_type=BotEvadeEnv.ActionType.DISCRETE,
                 )
     
@@ -69,28 +68,8 @@ if __name__ == "__main__":
         np.save('predator_appearance_positions.npy', predator_appearance_positions)
         print("Positions saved to 'predator_appearance_positions.npy'")
         
-        # Create density plot
-        plt.figure(figsize=(10, 8))
-        
         x_positions = predator_appearance_positions[:, 0]
         y_positions = predator_appearance_positions[:, 1]
-        
-        # Create 2D histogram (density plot)
-        plt.hist2d(x_positions, y_positions, bins=20, cmap='Blues', alpha=0.01)
-        plt.colorbar(label='Frequency')
-        
-        # Also overlay scatter plot
-        plt.scatter(x_positions, y_positions, alpha=0.1, c='red', s=30, label='Predator appearances')
-        
-        plt.xlabel('Prey X Position')
-        plt.ylabel('Prey Y Position')
-        plt.title('Density Plot of Prey Positions When Predator First Appears')
-        plt.legend()
-        plt.grid(True, alpha=0.3)
-        
-        # Save the plot
-        plt.savefig('predator_appearance_density.png', dpi=300, bbox_inches='tight')
-        plt.show()
         
         # Print statistics
         print(f"\nPosition Statistics:")
