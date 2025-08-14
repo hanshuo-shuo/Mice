@@ -18,7 +18,7 @@ if __name__ == "__main__":
     action_type = BotEvadeEnv.ActionType.DISCRETE
     # continuous action
     # action_type = BotEvadeEnv.ActionType.CONTINUOUS
-    env = BotEvadeEnv(world_name="21_05", 
+    env = BotEvadeEnv(world_name="clump01_05", 
                   use_lppos=False, 
                   use_predator=True, 
                   reward_function=custom_reward,

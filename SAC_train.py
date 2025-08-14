@@ -26,12 +26,11 @@ def train_sac():
         "MlpPolicy",
         env,
         verbose=1,
-        learning_rate=1e-4,
+        learning_rate=3e-4,
         tensorboard_log="./logs"
     )
-    
     # 训练模型
-    model.learn(total_timesteps=400000)
+    model.learn(total_timesteps=200000)
     # 保存训练好的模型
     model.save("sac")
     # 关闭环境
