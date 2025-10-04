@@ -11,15 +11,3 @@ pip install gymnasium stable-baselines3==2.3.2
 ```
 
 
-
-![image](https://github.com/user-attachments/assets/27a01107-83ed-4928-acbd-040dbf227dcd)
-
-
-
-
-![image](https://github.com/user-attachments/assets/cf18ea0d-7f25-4069-b84e-5b5a9c43172e)
-
-
-
-
-
