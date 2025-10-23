@@ -41,7 +41,7 @@ Environment Details:
 - The predator (blue dot) is constantly moving and trying to catch you, with a larger blue circle indicating the puffed area
 - If you can't see the predator, it means it's hidden behind obstacles
 - The environment has a grid to help you locate positions (x and y coordinates from 0 to 1)
-- Each move must be within the valid world boundaries
+- Each move must have an L2 norm less than 0.2
 
 Your response must be a JSON object with exactly this format:
 {
@@ -58,10 +58,6 @@ Strategy Considerations:
 4. Plan your path to minimize exposure to the predator
 5. Once at a goal, stay there briefly to complete it before moving to the next
 
-Rules for moves:
-1. Provide exactly 1 move (the next position to move to)
-2. The move should be within valid world boundaries (approximately 0 to 1 for both x and y)
-3. Move should be reachable and not through obstacles
 
 Example response:
 {
@@ -74,7 +70,7 @@ Example response:
 
 def get_message(image_path, PROMPT, current_goal, goals_remaining, last_action=None):
     MODEL = "gpt-4o"
-    APIKEY = ### YOUR OPENAI API KEY HERE ###
+    APIKEY = "YOUR_OPENAI_API_KEY"  # Replace with your actual OpenAI API key
     client = OpenAI(api_key=APIKEY)
 
     def encode_image(image_path):
@@ -175,19 +171,19 @@ def eval_llm():
 
     # Create environment
     env = OasisEnv(
-        world_name="21_05",
+        world_name="oasis_island7_02", 
         goal_locations=goal_locations,
-        use_lppos=False,
         use_predator=True,
-        max_step=500,
-        time_step=0.25,
-        reward_function=my_reward_fn,
+        max_step=300,
         render=True,
+        action_type=OasisEnv.ActionType.CONTINUOUS,
+        predator_speed_multiplier=0.15,
         real_time=False,
-        action_type=OasisEnv.ActionType.CONTINUOUS
+        goal_conditioned=False,  # LLM agent uses flat array observations
+        reward_function=my_reward_fn  # Need to pass reward function
     )
 
-    num_episodes = 1
+    num_episodes = 5
     for episode in range(1, num_episodes + 1):
         obs_list = []
         action_list = []
@@ -254,10 +250,10 @@ def eval_llm():
             done_list.append(done or truncated)
             next_obs_list.append(copy.deepcopy(next_obs))
 
-            # Print progress
-            if obs[10] > 0.5:  # goal_just_completed
+            # Print progress (check next_obs since these are set after the action)
+            if next_obs[10] > 0.5:  # goal_just_completed
                 print(f"  --> Goal completed! Goals remaining: {goals_remaining - 1}")
-            if obs[11] > 0.5:  # puffed
+            if next_obs[11] > 0.5:  # puffed
                 print(f"  --> Puffed by predator!")
 
             obs = next_obs
