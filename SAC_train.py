@@ -1,7 +1,7 @@
 import argparse
 import yaml
 from stable_baselines3 import SAC
-from env_infoRevealed import BotEvadeEnv
+from env3 import BotEvadeEnv
 from reward import *
 
 
