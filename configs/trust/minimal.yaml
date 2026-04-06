@@ -1,0 +1,20 @@
+# Minimal experiment: trust vs enemy, 1 episode each, plot trajectories.
+# Usage: python run_minimal.py
+
+experiment: minimal
+episodes: 1
+max_steps: 50
+world_name: "21_05"
+model: "google/gemini-3-flash-preview"
+
+conditions:
+  - name: high_trust
+    prompt_override: |
+      Mouse 2 is your sibling. You trust them completely.
+      You have survived together many times. You know they will
+      protect you and you can rely on their movements.
+  - name: low_trust
+    prompt_override: |
+      Mouse 2 is dangerous to you. They may lead the predator
+      toward you. Stay far away from them. Do not rely on them
+      for anything. They are not your ally.

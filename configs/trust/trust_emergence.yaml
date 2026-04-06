@@ -1,0 +1,14 @@
+# Experiment 3: Does trust build over repeated episodes?
+# Usage: python run_trust_experiment.py --config configs/trust/trust_emergence.yaml
+
+experiment: trust_emergence
+episodes: 20
+max_steps: 50
+world_name: "21_05"
+trust_emergence: true
+
+conditions:
+  - name: gemini_emergence
+    trust_condition: neutral
+    model1: "google/gemini-3-flash-preview"
+    model2: "google/gemini-3-flash-preview"
