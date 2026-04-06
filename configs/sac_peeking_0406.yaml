@@ -1,0 +1,12 @@
+frame_stack_k: 3
+max_step: 300
+model_name: sac_peeking_0406
+predator_prey_forward_speed_ratio: 0.3
+reward_function: custom_reward
+save_path: ./Saved_Models/
+seed: 3456
+time_step: 0.25
+total_timesteps: 150000
+use_lppos: false
+use_predator: true
+world_name: 'clump01_05'
