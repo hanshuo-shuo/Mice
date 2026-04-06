@@ -1,0 +1,17 @@
+name: Mice-SAC
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - matplotlib
+  - jupyterlab
+  - pytorch
+  - tensorboard
+  - pip:
+      - cellworld==0.0.381
+      - cellworld-belief==0.0.33
+      - gymnasium==0.28.1
+      - stable-baselines3==2.3.2
