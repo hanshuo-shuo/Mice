@@ -16,8 +16,6 @@ def custom_reward(obs):
                 "predator_x",
                 "predator_y",
                 "predator_direction",
-                "near_wall",
-                "near_occlusion",
                 "time_prey_seen_predator",
             ]
             obs_fields = [
@@ -28,8 +26,6 @@ def custom_reward(obs):
                 "predator_x",
                 "predator_y",
                 "predator_direction",
-                "near_wall", #geometric info
-                "near_occlusion",
                 "time_prey_seen_predator",
                 "puffed",
                 "puff_cooled_down",

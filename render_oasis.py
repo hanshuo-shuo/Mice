@@ -95,10 +95,7 @@ def run(args):
               f"{len(env.model.goal_sequence) + 1}")
 
         while not (done or truncated):
-            if args.continuous:
-                action = greedy_continuous_action(env)
-            else:
-                action = greedy_discrete_action(env)
+            action = env.action_space.sample()
 
             obs, reward, done, truncated, info = env.step(action)
             total_reward += reward

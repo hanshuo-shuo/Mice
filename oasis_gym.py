@@ -15,7 +15,7 @@ import math
 from gymnasium import Env
 from gymnasium import spaces
 from enum import Enum
-from util import find, normalize_angle, load_cell_ids_near_occlusion
+from util import normalize_angle
 
 # Fields that get frame-stacked (capture temporal dynamics)
 STACK_FIELDS = [
@@ -26,8 +26,6 @@ STACK_FIELDS = [
     "predator_x",
     "predator_y",
     "predator_direction",
-    "near_wall",
-    "near_occlusion",
     "time_prey_seen_predator",
 ]
 
@@ -106,8 +104,6 @@ class OasisObservation(Observation):
         "predator_x",
         "predator_y",
         "predator_direction",
-        "near_wall",
-        "near_occlusion",
         "time_prey_seen_predator",
         # --- non-stack (current frame only) ---
         "puffed",
@@ -239,21 +235,6 @@ class OasisEnv(Environment):
             self.model.predator.max_forward_speed = prey_max_forward_speed * predator_prey_forward_speed_ratio
             self.model.predator.max_turning_speed = prey_max_turning_speed * predator_prey_turning_speed_ratio
 
-        # Optional: load cell proximity data for near_wall / near_occlusion features
-        self.cell_ids_near_occlusion = None
-        self.cell_ids_near_wall = None
-        occlusion_path_map = {
-            "21_05": "./data/cell_ids_near_occlusion_21_05.npy",
-            "clump01_05": "./data/cell_ids_near_occlusion.npy",
-        }
-        wall_path = "./data/cell_ids_near_wall_strict.npy"
-        if world_name in occlusion_path_map:
-            occ_path = occlusion_path_map[world_name]
-            if os.path.exists(occ_path):
-                self.cell_ids_near_occlusion = load_cell_ids_near_occlusion(occ_path)
-        if os.path.exists(wall_path):
-            self.cell_ids_near_wall = load_cell_ids_near_occlusion(wall_path)
-
         # Observation space setup
         if self.observation_type == OasisEnv.ObservationType.DATA:
             self.observation = OasisObservation()
@@ -277,8 +258,6 @@ class OasisEnv(Environment):
         self.step_count = 0
         self.episode_reward = 0.0
         self.time_prey_seen_predator = -1
-        self.near_wall = True
-        self.near_occlusion = False
         self._prev_puffed = False
 
         Environment.__init__(self)
@@ -321,16 +300,6 @@ class OasisEnv(Environment):
                 obs.predator_direction = 0.0
 
             obs.time_prey_seen_predator = self.time_prey_seen_predator
-
-            # Proximity features (if data files available)
-            if self.cell_ids_near_wall is not None or self.cell_ids_near_occlusion is not None:
-                closest_cell = find(self.loader.locations, self.model.prey.state.location[:2])
-                if self.cell_ids_near_wall is not None:
-                    self.near_wall = closest_cell in self.cell_ids_near_wall
-                if self.cell_ids_near_occlusion is not None:
-                    self.near_occlusion = closest_cell in self.cell_ids_near_occlusion
-            obs.near_wall = float(self.near_wall)
-            obs.near_occlusion = float(self.near_occlusion)
 
             # Puff state (one-shot flag — cleared after reading)
             obs.puffed = float(self.model.puffed)
@@ -414,8 +383,6 @@ class OasisEnv(Environment):
         self.step_count = 0
         self.episode_reward = 0.0
         self.time_prey_seen_predator = -1
-        self.near_wall = True
-        self.near_occlusion = False
         obs = self.__update_observation__()
         if self.observation_type == OasisEnv.ObservationType.DATA:
             self.frame_stack.clear()

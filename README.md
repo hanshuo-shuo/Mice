@@ -1,15 +1,35 @@
 # Cellworld Gymnasium Environments
 
-Base repo: https://github.com/germanespinosa/cellworld_game
+Base repo: [https://github.com/germanespinosa/cellworld_game](https://github.com/germanespinosa/cellworld_game)
 
 Two Gymnasium-compatible environments wrapping the Cellworld simulation:
 
-| Environment | File | Task |
-|---|---|---|
-| `BotEvadeEnv` | `botevade_gym.py` | Prey evades a predator robot to reach a single goal |
-| `OasisEnv` | `oasis_gym.py` | Prey visits a sequence of goal locations while avoiding a predator |
+
+| Environment   | File              | Task                                                               |
+| ------------- | ----------------- | ------------------------------------------------------------------ |
+| `BotEvadeEnv` | `botevade_gym.py` | Prey evades a predator robot to reach a single goal                |
+| `OasisEnv`    | `oasis_gym.py`    | Prey visits a sequence of goal locations while avoiding a predator |
+
 
 ---
+
+## Environment Description
+
+Both environments are **POMDPs**: the prey agent does not always have line-of-sight to the predator, so the observation is only a partial view of the true state. This has practical implications for algorithm choice:
+
+- **Model-free methods** (e.g., SAC, PPO) work fine out of the box; frame stacking (`frame_stack_k`) provides a basic temporal context.
+- **Model-based methods** should account for partial observability — a recurrent world model (e.g., LSTM-based) is recommended to maintain a belief state over the hidden predator position.
+
+## RL Resources
+
+
+| Library           | Link                                                                                                                             | Notes                                                                |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Spinning Up       | [https://spinningup.openai.com/en/latest/user/introduction.html](https://spinningup.openai.com/en/latest/user/introduction.html) | Good conceptual intro to RL algorithms                               |
+| Stable-Baselines3 | [https://stable-baselines3.readthedocs.io/en/master/index.html](https://stable-baselines3.readthedocs.io/en/master/index.html)   | Easy to use; covers standard model-free algorithms                   |
+| Tianshou          | [https://tianshou.org/en/stable/](https://tianshou.org/en/stable/)                                                               | More flexible; supports n-step returns and custom collectors         |
+| SheepRL           | [https://github.com/Eclectic-Sheep/sheeprl](https://github.com/Eclectic-Sheep/sheeprl)                                           | Model-based RL; includes Dreamer-V3 with a built-in LSTM world model |
+
 
 ## Setup
 
@@ -65,26 +85,28 @@ env.close()
 
 ### Constructor parameters
 
-| Parameter | Type | Default | Description |
-|---|---|---|---|
-| `world_name` | `str` | `"oasis_island7_02"` | Cellworld layout name |
-| `goal_locations` | `list[tuple]` | 7 canonical oases | (x, y) goal positions |
-| `use_predator` | `bool` | `True` | Enable the predator robot |
-| `use_lppos` | `bool` | `False` | Use TLPPO action list instead of full list |
-| `max_step` | `int` | `500` | Truncation step limit |
-| `reward_function` | `callable` | `lambda obs: 0` | Custom reward `f(obs) -> float` |
-| `time_step` | `float` | `0.25` | Simulated seconds per `env.step()` call |
-| `render` | `bool` | `False` | Open a pygame window |
-| `real_time` | `bool` | `False` | Throttle simulation to real time |
-| `point_of_view` | `PointOfView` | `TOP` | Camera view (`TOP`, `PREY`, `PREDATOR`) |
-| `observation_type` | `ObservationType` | `DATA` | `DATA` (vector) or `PIXELS` (image) |
-| `action_type` | `ActionType` | `DISCRETE` | `DISCRETE` (index) or `CONTINUOUS` (x,y) |
-| `frame_stack_k` | `int` | `3` | Number of frames to stack |
-| `puff_cool_down_time` | `float` | `0.5` | Seconds between predator puffs |
-| `puff_threshold` | `float` | `0.1` | Distance at which predator puffs |
-| `goal_threshold` | `float` | `0.025` | Distance at which prey "arrives" at goal |
-| `goal_time` | `float` | `1.0` | Dwell time required at each goal (seconds) |
-| `max_line_of_sight_distance` | `float` | `1.0` | Maximum vision range |
+
+| Parameter                    | Type              | Default              | Description                                |
+| ---------------------------- | ----------------- | -------------------- | ------------------------------------------ |
+| `world_name`                 | `str`             | `"oasis_island7_02"` | Cellworld layout name                      |
+| `goal_locations`             | `list[tuple]`     | 7 canonical oases    | (x, y) goal positions                      |
+| `use_predator`               | `bool`            | `True`               | Enable the predator robot                  |
+| `use_lppos`                  | `bool`            | `False`              | Use TLPPO action list instead of full list |
+| `max_step`                   | `int`             | `500`                | Truncation step limit                      |
+| `reward_function`            | `callable`        | `lambda obs: 0`      | Custom reward `f(obs) -> float`            |
+| `time_step`                  | `float`           | `0.25`               | Simulated seconds per `env.step()` call    |
+| `render`                     | `bool`            | `False`              | Open a pygame window                       |
+| `real_time`                  | `bool`            | `False`              | Throttle simulation to real time           |
+| `point_of_view`              | `PointOfView`     | `TOP`                | Camera view (`TOP`, `PREY`, `PREDATOR`)    |
+| `observation_type`           | `ObservationType` | `DATA`               | `DATA` (vector) or `PIXELS` (image)        |
+| `action_type`                | `ActionType`      | `DISCRETE`           | `DISCRETE` (index) or `CONTINUOUS` (x,y)   |
+| `frame_stack_k`              | `int`             | `3`                  | Number of frames to stack                  |
+| `puff_cool_down_time`        | `float`           | `0.5`                | Seconds between predator puffs             |
+| `puff_threshold`             | `float`           | `0.1`                | Distance at which predator puffs           |
+| `goal_threshold`             | `float`           | `0.025`              | Distance at which prey "arrives" at goal   |
+| `goal_time`                  | `float`           | `1.0`                | Dwell time required at each goal (seconds) |
+| `max_line_of_sight_distance` | `float`           | `1.0`                | Maximum vision range                       |
+
 
 ### Observation space (`DATA` mode)
 
@@ -92,34 +114,31 @@ The observation vector has shape `(10 * frame_stack_k + 7,)`.
 
 **Stacked fields** (repeated for each frame in the stack):
 
-| Field | Description |
-|---|---|
-| `prey_x`, `prey_y` | Prey position in [0, 1] |
-| `prey_direction` | Prey heading in [0, 2π) |
-| `predator_visible` | 1 if predator is in line-of-sight, else 0 |
-| `predator_x`, `predator_y` | Predator position (0 if not visible) |
-| `predator_direction` | Predator heading (0 if not visible) |
-| `near_wall` | 1 if prey is near the arena wall |
-| `near_occlusion` | 1 if prey is near an occlusion |
-| `time_prey_seen_predator` | Step index when predator was last seen (−1 = never) |
+
+| Field                      | Description                                         |
+| -------------------------- | --------------------------------------------------- |
+| `prey_x`, `prey_y`         | Prey position in [0, 1]                             |
+| `prey_direction`           | Prey heading in [0, 2π)                             |
+| `predator_visible`         | 1 if predator is in line-of-sight, else 0           |
+| `predator_x`, `predator_y` | Predator position (0 if not visible)                |
+| `predator_direction`       | Predator heading (0 if not visible)                 |
+| `near_wall`                | 1 if prey is near the arena wall                    |
+| `near_occlusion`           | 1 if prey is near an occlusion                      |
+| `time_prey_seen_predator`  | Step index when predator was last seen (−1 = never) |
+
 
 **Non-stacked fields** (current frame only):
 
-| Field | Description |
-|---|---|
-| `puffed` | 1 if puffed this step |
-| `puff_cooled_down` | Remaining puff cooldown (seconds) |
-| `finished` | 1 if episode ended naturally |
-| `prey_goal_distance` | Distance to active goal |
-| `goal_x`, `goal_y` | Active goal coordinates |
-| `goals_remaining` | Goals left in the sequence |
 
-### Action space
+| Field                | Description                       |
+| -------------------- | --------------------------------- |
+| `puffed`             | 1 if puffed this step             |
+| `puff_cooled_down`   | Remaining puff cooldown (seconds) |
+| `finished`           | 1 if episode ended naturally      |
+| `prey_goal_distance` | Distance to active goal           |
+| `goal_x`, `goal_y`   | Active goal coordinates           |
+| `goals_remaining`    | Goals left in the sequence        |
 
-| `action_type` | Space | Description |
-|---|---|---|
-| `DISCRETE` | `Discrete(N)` | Index into the pre-computed action list |
-| `CONTINUOUS` | `Box(0, 1, (2,))` | `(x, y)` destination in canonical coordinates |
 
 ### Custom reward example
 
@@ -169,36 +188,21 @@ env.close()
 
 ---
 
-## Rendering the Oasis environment
-
-```bash
-# Default: 2 episodes with predator, discrete actions
-python render_oasis.py
-
-# No predator
-python render_oasis.py --no-predator
-
-# Continuous action space
-python render_oasis.py --continuous
-
-# Run 5 episodes
-python render_oasis.py --episodes 5
-```
-
-A pygame window opens showing the arena, prey (mouse), predator (robot),
-goal oases (green = active, red = inactive), and the predator puff radius.
-
----
-
 ## Training with SAC
 
 ```bash
-python SAC_train.py --config configs/sac_peeking_0406.yaml
+python SAC_train_example.py --config configs/sac_oasis_0416.yaml
 ```
 
 Edit `configs/configs.py` and run it to generate a new config with today's date:
 
 ```bash
 python configs/configs.py
-python SAC_train.py --config configs/sac_peeking_<MMDD>.yaml
+python SAC_train_example.py --config configs/NAMEOFCONFIG_<MMDD>.yaml
 ```
+
+## TO DO
+
+- **Oasis map navigation bug**: `Navigation.get_path()` generates paths that cut through obstacles on non-21_05 maps (e.g. `oasis_island7_02`). The visibility-based path optimization skips waypoints assuming line-of-sight, but the resulting straight-line segments can clip obstacle geometry. Need to either fix the visibility graph or add collision as a fallback.
+- **Oasis observation incomplete**: The current observation space is missing data. Previously we had 21_05-specific data for `near_obstacle` and `near_wall` observations — this needs to be generalized for other maps like `oasis_island7_02`.
+
