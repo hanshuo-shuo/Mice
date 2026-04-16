@@ -46,7 +46,9 @@ class DualEvade(Model):
                  render: bool = False,
                  point_of_view: PointOfView = PointOfView.TOP,
                  agent_render_mode: Agent.RenderMode = Agent.RenderMode.SPRITE,
-                 max_line_of_sight_distance: float = 1.0):
+                 max_line_of_sight_distance: float = 1.0,
+                 prey_max_forward_speed: float = 0.5,
+                 predator_prey_forward_speed_ratio: float = 0.15):
         self.use_predator = use_predator
         self.puff_cool_down_time = puff_cool_down_time
         self.puff_threshold = puff_threshold
@@ -67,19 +69,22 @@ class DualEvade(Model):
         if use_predator:
             self.predator = Robot(start_locations=self.loader.robot_start_locations,
                                   open_locations=self.loader.open_locations,
-                                  navigation=self.loader.navigation)
+                                  navigation=self.loader.navigation,
+                                  max_forward_speed=prey_max_forward_speed * predator_prey_forward_speed_ratio)
 
             self.add_agent("predator", self.predator)
 
         self.prey_1 = Mouse(start_state=AgentState(location=(.05, .5),
                                                    direction=0),
-                            navigation=self.loader.navigation)
+                            navigation=self.loader.navigation,
+                            max_forward_speed=prey_max_forward_speed)
 
         self.add_agent("prey_1", self.prey_1)
 
         self.prey_2 = Mouse(start_state=AgentState(location=(.05, .5),
                                                    direction=0),
-                            navigation=self.loader.navigation)
+                            navigation=self.loader.navigation,
+                            max_forward_speed=prey_max_forward_speed)
 
         self.add_agent("prey_2", self.prey_2)
 
@@ -106,8 +111,8 @@ class DualEvade(Model):
                                        radius=puff_area_size,
                                        width=2)
 
-                if point_of_view == self.PointOfView.TOP:
-                    self.view.add_render_step(render_puff_area, z_index=90)
+                # Always register; the visibility mask handles PREY view.
+                self.view.add_render_step(render_puff_area, z_index=90)
 
         self.puff_cool_down: float = 0
         self.prey_data_1 = DualEvadePreyData()

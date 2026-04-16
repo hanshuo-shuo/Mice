@@ -78,8 +78,65 @@ class Polygon(IPolygon):
         inside = crossings % 2 == 1
         return inside
 
-    def intersects(self, other: "Polygon"):
-        return self.contains(points=other.vertices).any()
+    def intersects(self, other: "Polygon") -> bool:
+        """Proper polygon-polygon intersection test.
+
+        The previous implementation only checked if any vertex of `other`
+        lay inside `self`, which misses three very common cases for small
+        agent bodies vs world occlusions:
+          (1) a vertex of `self` is inside `other` (e.g. the agent body
+              sitting fully inside a large occlusion)
+          (2) `self` is fully contained in `other` with none of its
+              vertices coinciding with `other`'s vertices
+          (3) edges cross without any vertex being inside either polygon
+              (common for thin, elongated bodies clipping a wall corner)
+
+        We now test:
+          - any `other`-vertex inside `self`
+          - any `self`-vertex inside `other`
+          - any edge of `self` crossing any edge of `other`
+        which correctly detects intersection for arbitrary convex or
+        concave simple polygons.
+        """
+        # --- case 1: other's vertices inside self ---
+        if bool(self.contains(points=other.vertices).any()):
+            return True
+        # --- case 2: self's vertices inside other ---
+        if bool(other.contains(points=self.vertices).any()):
+            return True
+        # --- case 3: vectorized edge-edge crossing test ---
+        # For each edge pair (a1->a2 in self, b1->b2 in other) we use the
+        # standard CCW sign test: segments strictly cross iff the two
+        # endpoints of one segment lie on opposite sides of the other and
+        # vice versa. Collinear-touching is treated as non-intersecting,
+        # which matches shapely's default behavior for the "just kissing"
+        # case and is what the old rotate-retry loop relied on.
+        a = self.vertices  # (n, 2)
+        b = other.vertices  # (m, 2)
+        n = a.shape[0]
+        m = b.shape[0]
+        if n < 2 or m < 2:
+            return False
+        a1 = a
+        a2 = a[(torch.arange(n, device=a.device) + 1) % n]
+        b1 = b
+        b2 = b[(torch.arange(m, device=b.device) + 1) % m]
+        # broadcast to shape (n, m, 2)
+        A1 = a1.unsqueeze(1).expand(n, m, 2)
+        A2 = a2.unsqueeze(1).expand(n, m, 2)
+        B1 = b1.unsqueeze(0).expand(n, m, 2)
+        B2 = b2.unsqueeze(0).expand(n, m, 2)
+
+        def _ccw(p, q, r):
+            return (r[..., 1] - p[..., 1]) * (q[..., 0] - p[..., 0]) - \
+                   (q[..., 1] - p[..., 1]) * (r[..., 0] - p[..., 0])
+
+        d1 = _ccw(B1, B2, A1)
+        d2 = _ccw(B1, B2, A2)
+        d3 = _ccw(A1, A2, B1)
+        d4 = _ccw(A1, A2, B2)
+        crosses = ((d1 * d2) < 0) & ((d3 * d4) < 0)
+        return bool(crosses.any())
 
     def __getitem__(self, item) -> typing.Tuple[float, float]:
         return tuple(self.vertices[item, :].tolist())

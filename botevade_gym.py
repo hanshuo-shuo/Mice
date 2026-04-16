@@ -6,11 +6,17 @@ from collections import deque
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(BASE_DIR, ".."))
-CELLWORLD_PATH = os.path.join(PROJECT_ROOT, "cellworld_game-main")
+CELLWORLD_PATH = os.path.join(BASE_DIR, "cellworld_game-main")
 if CELLWORLD_PATH not in sys.path:
     sys.path.insert(0, CELLWORLD_PATH)
+
+# Make absolutely sure we import the local (point-mass) version of
+# cellworld_game, not the pip-installed one that may be shadowing it.
+for _mod in [m for m in list(sys.modules) if m == "cellworld_game" or m.startswith("cellworld_game.")]:
+    del sys.modules[_mod]
 import cellworld_game as cwgame
+assert os.path.abspath(os.path.dirname(cwgame.__file__)).startswith(CELLWORLD_PATH), \
+    f"env3.py imported cellworld_game from {cwgame.__file__} instead of {CELLWORLD_PATH}"
 import numpy as np
 import math
 from gymnasium import Env
@@ -18,14 +24,13 @@ from gymnasium import spaces
 from enum import Enum
 from util import find, normalize_angle, load_cell_ids_near_occlusion
 
-print("Using env3: Observation with only mice agent line of sight information")
+print("Using env3 (point-mass): (ax, ay) action, velocity in observation")
 
-# Define a threshold for the peeking action
-PEEK_THRESHOLD = 0.5
 STACK_FIELDS = [
     "prey_x",
     "prey_y",
-    "prey_direction",
+    "prey_vx",
+    "prey_vy",
     "predator_visible",
     "predator_x",
     "predator_y",
@@ -111,7 +116,8 @@ class BotEvadeObservation(Observation):
     fields = [
         "prey_x",
         "prey_y",
-        "prey_direction",
+        "prey_vx",
+        "prey_vy",
         "predator_visible",
         "predator_x",
         "predator_y",
@@ -122,7 +128,6 @@ class BotEvadeObservation(Observation):
         "puffed",
         "puff_cooled_down",
         "finished",
-        "peeking",
         "prey_goal_distance"
     ]
 
@@ -153,7 +158,7 @@ class BotEvadeEnv(Environment):
                  time_step: float = .25,
                  render: bool = False,
                  real_time: bool = False,
-                 point_of_view: PointOfView = PointOfView.PREY,
+                 point_of_view: PointOfView = PointOfView.TOP,
                  agent_render_mode: AgentRenderMode = AgentRenderMode.SPRITE,
                  observation_type: ObservationType = ObservationType.DATA,
                  action_type: ActionType = ActionType.DISCRETE,
@@ -180,9 +185,18 @@ class BotEvadeEnv(Environment):
         self.action_type = action_type
         self.frame_stack_k = frame_stack_k
         if self.action_type == BotEvadeEnv.ActionType.DISCRETE:
-            self.action_space = spaces.Discrete(len(self.action_list))
+            # 8 cardinal/diagonal accelerations + stop
+            self._discrete_actions = np.array([
+                ( 0.0,  0.0),  # stop
+                ( 1.0,  0.0), ( 0.707,  0.707),
+                ( 0.0,  1.0), (-0.707,  0.707),
+                (-1.0,  0.0), (-0.707, -0.707),
+                ( 0.0, -1.0), ( 0.707, -0.707),
+            ], dtype=np.float32)
+            self.action_space = spaces.Discrete(len(self._discrete_actions))
         else:
-            self.action_space = spaces.Box(0.0, 1.0, (3,), dtype=np.float32) 
+            # PointMaze-style: (ax, ay) desired acceleration in [-1, 1]
+            self.action_space = spaces.Box(-1.0, 1.0, (2,), dtype=np.float32)
 
         self.model = cwgame.BotEvade(world_name=world_name,
                                      real_time=real_time,
@@ -227,7 +241,6 @@ class BotEvadeEnv(Environment):
         self.prey_trajectory_length = 0
         self.predator_trajectory_length = 0
         self.episode_reward = 0
-        self.peeking = False 
         self.step_count = 0
         self.time_prey_seen_predator = -1 # Initialize with -1, meaning never seen
         # info
@@ -243,8 +256,8 @@ class BotEvadeEnv(Environment):
         if self.observation_type == BotEvadeEnv.ObservationType.DATA:
             self.observation.prey_x = self.model.prey.state.location[0]
             self.observation.prey_y = self.model.prey.state.location[1]
-             # Normalize direction to the range [0, 2*pi) 
-            self.observation.prey_direction = normalize_angle(math.radians(self.model.prey.state.direction)) 
+            self.observation.prey_vx = self.model.prey.state.velocity[0]
+            self.observation.prey_vy = self.model.prey.state.velocity[1]
             self.observation.prey_goal_distance = self.model.prey_data.prey_goal_distance
 
 
@@ -285,7 +298,6 @@ class BotEvadeEnv(Environment):
             self.observation.near_wall = self.near_wall
             self.near_occlusion = closest_cell in self.cell_ids_near_occlusion
             self.observation.near_occlusion = self.near_occlusion
-            self.observation.peeking = self.peeking
         else:
             self.observation = self.model.view.get_screen()
         return self.__get_stacked_observation__()
@@ -303,19 +315,16 @@ class BotEvadeEnv(Environment):
         return np.concatenate([stacked, current_nonstack], axis=0)
 
 
-    def set_action(self, action: typing.Union[int, typing.Tuple[float, float, float]]): #typing.Union accepts both int and tuple
+    def set_action(self, action):
+        """Action is either a Discrete index (into `_discrete_actions`) or a
+        2-vector `(ax, ay) ∈ [-1, 1]²` interpreted as a desired acceleration
+        for the prey's point-mass dynamics."""
         if self.action_type == BotEvadeEnv.ActionType.DISCRETE:
-            self.model.prey.set_destination(self.action_list[action])
-        
+            ax, ay = self._discrete_actions[int(action)]
         else:
-            if action[2] > PEEK_THRESHOLD:
-                self.model.prey.set_destination(self.model.prey.state.location[:2]) 
-                # Stop navigation 
-                self.model.prey.stop_navigation()
-                self.peeking = True
-            else:
-                self.model.prey.set_destination(tuple(action[:2])) 
-                self.peeking = False
+            ax = float(action[0])
+            ay = float(action[1])
+        self.model.prey.set_action(ax, ay)
 
            
 
@@ -360,7 +369,7 @@ class BotEvadeEnv(Environment):
                                     delta_t=self.time_step)
         return self.__step__()
 
-    def step(self, action: typing.Union[int, typing.Tuple[float, float, float]]):
+    def step(self, action):
         self.set_action(action=action)
         model_t = self.model.time + self.time_step
         while self.model.running and self.model.time < model_t: #while the model is running and the time is less than the model time, step the model
@@ -376,7 +385,6 @@ class BotEvadeEnv(Environment):
         self.time_prey_seen_predator = -1
         self.prey_visible_last_step = 0
         self.predator_visible_last_step = 0
-        self.peeking = False
         obs = self.__update_observation__()
         if self.observation_type == BotEvadeEnv.ObservationType.DATA:
             self.frame_stack.clear()

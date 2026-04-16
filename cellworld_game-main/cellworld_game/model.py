@@ -1,9 +1,10 @@
+import math
 import time
 import typing
 import shapely as sp
 
 from .util import Point
-from .agent import Agent, AgentState
+from .agent import Agent, AgentState, PointDynamics
 from .visibility import Visibility
 from .polygon import Polygon
 from .event import EventDispatcher
@@ -219,6 +220,72 @@ class Model(EventDispatcher):
         self.running = False
         self.__dispatch__("after_stop", self)
 
+    def _point_step(self, agent: Agent, dt: float) -> AgentState:
+        """Semi-implicit Euler integration of a 2D point mass with linear
+        damping, followed by slide-on-collision. Used for any agent whose
+        `dynamics` is a `PointDynamics`."""
+        d = agent.dynamics
+        vx, vy = agent.state.velocity
+        # semi-implicit Euler + linear damping
+        vx = vx + (d.accel_scale * d.ax - d.damping * vx) * dt
+        vy = vy + (d.accel_scale * d.ay - d.damping * vy) * dt
+        # speed cap
+        speed = math.hypot(vx, vy)
+        if speed > d.v_max:
+            s = d.v_max / speed
+            vx *= s
+            vy *= s
+
+        x0, y0 = agent.state.location
+        new_x = x0 + vx * dt
+        new_y = y0 + vy * dt
+
+        new_dir = agent.state.direction
+        if speed > 1e-4:
+            new_dir = math.degrees(math.atan2(vy, vx))
+
+        cand = AgentState(location=(new_x, new_y),
+                          direction=new_dir,
+                          velocity=(vx, vy))
+        return self._slide_collide(agent, cand, dt)
+
+    def _slide_collide(self,
+                       agent: Agent,
+                       cand: AgentState,
+                       dt: float) -> AgentState:
+        """Try full move; if it collides, try sliding along x only, then y
+        only; if both fail, stop in place (velocity zeroed). This is the
+        point-mass replacement for the unicycle rotate/translate retry."""
+        if not agent.collision or self.is_valid_state(
+                agent.get_body_polygon(state=cand), agent.collision):
+            return cand
+
+        x0, y0 = agent.state.location
+        vx, vy = cand.velocity
+
+        # x-only
+        x_only = AgentState(location=(x0 + vx * dt, y0),
+                            direction=(math.degrees(math.atan2(0.0, vx))
+                                       if abs(vx) > 1e-4 else agent.state.direction),
+                            velocity=(vx, 0.0))
+        if self.is_valid_state(agent.get_body_polygon(state=x_only),
+                               agent.collision):
+            return x_only
+
+        # y-only
+        y_only = AgentState(location=(x0, y0 + vy * dt),
+                            direction=(math.degrees(math.atan2(vy, 0.0))
+                                       if abs(vy) > 1e-4 else agent.state.direction),
+                            velocity=(0.0, vy))
+        if self.is_valid_state(agent.get_body_polygon(state=y_only),
+                               agent.collision):
+            return y_only
+
+        # fully stuck — stop
+        return AgentState(location=(x0, y0),
+                          direction=agent.state.direction,
+                          velocity=(0.0, 0.0))
+
     def is_valid_state(self, agent_polygon: sp.Polygon, collisions: bool) -> bool:
         if not self.arena.contains(agent_polygon):
             return False
@@ -245,25 +312,29 @@ class Model(EventDispatcher):
         new_states: typing.Dict[str, AgentState] = {}
         new_body_polygons: typing.Dict[str, Polygon] = {}
         for name, agent in self.agents.items():
-            dynamics = agent.dynamics
-            distance, rotation = dynamics.change(delta_t=self.time_step)
-            new_state = agent.state.update(rotation=rotation,
-                                           distance=distance)
-            agent_polygon = agent.get_body_polygon(state=new_state)
-            if not self.is_valid_state(agent_polygon=agent_polygon,
-                                       collisions=agent.collision): #try only rotation
+            if isinstance(agent.dynamics, PointDynamics):
+                new_state = self._point_step(agent, self.time_step)
+                agent_polygon = agent.get_body_polygon(state=new_state)
+            else:
+                dynamics = agent.dynamics
+                distance, rotation = dynamics.change(delta_t=self.time_step)
                 new_state = agent.state.update(rotation=rotation,
-                                               distance=0)
+                                               distance=distance)
                 agent_polygon = agent.get_body_polygon(state=new_state)
                 if not self.is_valid_state(agent_polygon=agent_polygon,
-                                           collisions=agent.collision): #try only translation
-                    new_state = agent.state.update(rotation=0,
-                                                   distance=distance)
+                                           collisions=agent.collision): #try only rotation
+                    new_state = agent.state.update(rotation=rotation,
+                                                   distance=0)
                     agent_polygon = agent.get_body_polygon(state=new_state)
                     if not self.is_valid_state(agent_polygon=agent_polygon,
-                                               collisions=agent.collision):
-                        new_state = agent.state
-                        agent_polygon = agent.body_polygon
+                                               collisions=agent.collision): #try only translation
+                        new_state = agent.state.update(rotation=0,
+                                                       distance=distance)
+                        agent_polygon = agent.get_body_polygon(state=new_state)
+                        if not self.is_valid_state(agent_polygon=agent_polygon,
+                                                   collisions=agent.collision):
+                            new_state = agent.state
+                            agent_polygon = agent.body_polygon
             new_states[name] = new_state
             new_body_polygons[name] = agent_polygon
         self.set_agents_state(agents_state=new_states, agents_body_polygons=new_body_polygons)

@@ -1,4 +1,4 @@
-name: Mice-SAC
+name: Mice-BotEvade
 channels:
   - conda-forge
   - defaults

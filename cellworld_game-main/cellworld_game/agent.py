@@ -8,9 +8,13 @@ from .event import EventDispatcher
 
 
 class AgentState(object):
-    def __init__(self, location: Point.type = (0, 0), direction: float = 0):
+    def __init__(self,
+                 location: Point.type = (0, 0),
+                 direction: float = 0,
+                 velocity: typing.Tuple[float, float] = (0.0, 0.0)):
         self.location = location
         self.direction = direction
+        self.velocity = velocity
 
     def __iter__(self):
         yield self.location
@@ -23,10 +27,13 @@ class AgentState(object):
         return AgentState(location=Point.move(start=self.location,
                                               direction_degrees=new_direction,
                                               distance=distance),
-                          direction=new_direction)
+                          direction=new_direction,
+                          velocity=self.velocity)
 
     def copy(self) -> "AgentState":
-        return AgentState(location=self.location,direction=self.direction)
+        return AgentState(location=self.location,
+                          direction=self.direction,
+                          velocity=self.velocity)
 
 
 class AgentDynamics(object):
@@ -40,6 +47,20 @@ class AgentDynamics(object):
 
     def change(self, delta_t: float) -> tuple:
         return self.forward_speed * delta_t,  self.turn_speed * delta_t
+
+
+class PointDynamics(object):
+    """2D point-mass dynamics: action = (ax, ay) ∈ [-1, 1]²,
+    interpreted as desired acceleration scaled by `accel_scale`."""
+    def __init__(self,
+                 accel_scale: float = 6.0,
+                 v_max: float = 0.5,
+                 damping: float = 8.0):
+        self.ax: float = 0.0
+        self.ay: float = 0.0
+        self.accel_scale = accel_scale
+        self.v_max = v_max
+        self.damping = damping
 
 
 class Agent(EventDispatcher):

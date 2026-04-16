@@ -1,7 +1,7 @@
 import argparse
 import yaml
 from stable_baselines3 import SAC
-from env3 import BotEvadeEnv
+from botevade_gym import BotEvadeEnv
 from reward import *
 
 
@@ -50,7 +50,7 @@ def train_sac(config):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str)
+    parser.add_argument("--config", type=str, default="configs/sac_peeking_0406.yaml")
     args = parser.parse_args()
 
     config = load_config(args.config)

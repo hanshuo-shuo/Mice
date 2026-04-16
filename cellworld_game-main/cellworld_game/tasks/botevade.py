@@ -115,8 +115,12 @@ class BotEvade(Model):
                                        center=predator_location,
                                        radius=puff_area_size,
                                        width=2)
-                if point_of_view == self.PointOfView.TOP:
-                    self.view.add_render_step(render_puff_area, z_index=90)
+                # Register the puff-range overlay regardless of POV. In
+                # PREY view the visibility mask (z=1000) naturally clips it
+                # when the predator is out of line of sight; in TOP view it
+                # is always shown. This used to be TOP-only, which made the
+                # range invisible while training/rendering with PREY view.
+                self.view.add_render_step(render_puff_area, z_index=90)
 
         self.puff_cool_down: float = 0
         self.prey_data = BotEvadePreyData()

@@ -31,7 +31,11 @@ class Oasis(Model):
                  render: bool = False,
                  point_of_view: PointOfView = PointOfView.TOP,
                  agent_render_mode: Agent.RenderMode = Agent.RenderMode.SPRITE,
-                 max_line_of_sight_distance: float = 1.0):
+                 max_line_of_sight_distance: float = 1.0,
+                 prey_max_forward_speed: float = 0.5,
+                 prey_max_turning_speed: float = 20.0,
+                 predator_prey_forward_speed_ratio: float = 0.15,
+                 predator_prey_turning_speed_ratio: float = 0.175):
 
         if goal_sequence_generator is None:
             goal_sequence_generator = lambda: random.sample(range(0, len(goal_locations)), 3)
@@ -59,16 +63,20 @@ class Oasis(Model):
                        agent_point_of_view=point_of_view.value,
                        max_line_of_sight_distance=max_line_of_sight_distance)
 
+        self.prey = Mouse(start_state=AgentState(location=self.start_location,
+                                                 direction=0),
+                          navigation=self.loader.navigation,
+                          max_forward_speed=prey_max_forward_speed,
+                          max_turning_speed=prey_max_turning_speed)
+
         if use_predator:
             self.predator = Robot(start_locations=self.loader.robot_start_locations,
                                   open_locations=self.loader.open_locations,
-                                  navigation=self.loader.navigation)
+                                  navigation=self.loader.navigation,
+                                  max_forward_speed=self.prey.max_forward_speed * predator_prey_forward_speed_ratio,
+                                  max_turning_speed=self.prey.max_turning_speed * predator_prey_turning_speed_ratio)
 
             self.add_agent("predator", self.predator)
-
-        self.prey = Mouse(start_state=AgentState(location=self.start_location,
-                                                 direction=0),
-                          navigation=self.loader.navigation)
 
         self.add_agent("prey", self.prey)
 
