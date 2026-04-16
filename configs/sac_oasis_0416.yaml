@@ -1,0 +1,14 @@
+frame_stack_k: 3 # stack 3 frames of observation like memory
+max_step: 300 # max step of the episode
+model_name: sac_oasis_0416
+predator_prey_forward_speed_ratio: 0.3
+predator_prey_turning_speed_ratio: 0.175
+prey_max_forward_speed: 0.5
+prey_max_turning_speed: 20.0
+reward_function: oasis_reward()
+save_path: ./Saved_Models/
+seed: 3456
+time_step: 0.25
+total_timesteps: 200000
+use_predator: true
+world_name: 'oasis_island7_02'
